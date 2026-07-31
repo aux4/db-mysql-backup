@@ -11,6 +11,7 @@
     "restore"
   ],
   "dependencies": [
+    "aux4/config",
     "aux4/db-mysql"
   ],
   "system": [
