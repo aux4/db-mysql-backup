@@ -48,7 +48,9 @@
             "MYSQLDUMP=$(command -v mysqldump 2>/dev/null); if [ -z \"$MYSQLDUMP\" ]; then BP=$(brew --prefix mysql-client 2>/dev/null); [ -n \"$BP\" ] && [ -x \"$BP/bin/mysqldump\" ] && MYSQLDUMP=\"$BP/bin/mysqldump\"; fi; if [ -z \"$MYSQLDUMP\" ]; then echo 'Error: mysqldump not found. Install mysql-client (brew install mysql-client / apt-get install default-mysql-client).' >&2; exit 1; fi; MYSQL_PWD=value(password) \"$MYSQLDUMP\" params(host, port, user) ${dumpOpts} value(database) > value(backuppath) || { rm -f value(backuppath); exit 1; }",
             "set:bytes=!wc -c < value(backuppath) | tr -d ' '",
             "set:checksum=!( shasum -a 256 value(backuppath) 2>/dev/null || sha256sum value(backuppath) ) | awk '{print $1}'",
-            "echo '{\"path\":\"${backuppath}\",\"bytes\":${bytes},\"checksum\":\"${checksum}\",\"status\":\"success\",\"format\":\"mysql-sqldump\"}'"
+            "set:status=success",
+            "set:format=mysql-sqldump",
+            "echo 'object(backuppath:path, bytes, checksum, status, format)'"
           ],
           "help": {
             "text": "Backup the database to a SQL dump file using mysqldump",
@@ -152,10 +154,11 @@
             "when:${dir} && ${file}:set:fullpath=${dir}/${file}",
             "set:backuppath=nvl(path, fullpath)",
             "when:${backuppath}==:exit:1:Error: provide --path, or --dir and --file",
-            "exists(backuppath) || { echo 'Error: backup file not found: ${backuppath}' >&2; exit 1; }",
+            "exists(backuppath) || { echo 'Error: backup file not found:' value(backuppath) >&2; exit 1; }",
             "set:restoreOpts=param(defaultCharacterSet:default-character-set) param(maxAllowedPacket:max-allowed-packet) ${options}",
             "MYSQL=$(command -v mysql 2>/dev/null); if [ -z \"$MYSQL\" ]; then BP=$(brew --prefix mysql-client 2>/dev/null); [ -n \"$BP\" ] && [ -x \"$BP/bin/mysql\" ] && MYSQL=\"$BP/bin/mysql\"; fi; if [ -z \"$MYSQL\" ]; then echo 'Error: mysql client not found. Install mysql-client (brew install mysql-client / apt-get install default-mysql-client).' >&2; exit 1; fi; MYSQL_PWD=value(password) \"$MYSQL\" params(host, port, user) ${restoreOpts} value(database) < value(backuppath)",
-            "echo '{\"path\":\"${backuppath}\",\"status\":\"success\"}'"
+            "set:status=success",
+            "echo 'object(backuppath:path, status)'"
           ],
           "help": {
             "text": "Restore the database from a SQL dump file using the mysql client",

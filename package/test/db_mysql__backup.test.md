@@ -62,7 +62,7 @@ aux4 db mysql backup --configFile config.yaml --config test --path /tmp/aux4-bkp
 ```
 
 ```expect:regex
-\{"path":"/tmp/aux4-bkp-test\.sql","bytes":\d+,"checksum":"[a-f0-9]{64}","status":"success","format":"mysql-sqldump"\}
+\{"bytes":"\d+","checksum":"[a-f0-9]{64}","format":"mysql-sqldump","path":"/tmp/aux4-bkp-test\.sql","status":"success"\}
 ```
 
 ### should create a non-empty dump file
@@ -84,7 +84,7 @@ aux4 db mysql backup --configFile config.yaml --config test --dir /tmp --file au
 ```
 
 ```expect:regex
-\{"path":"/tmp/aux4-bkp-dirfile\.sql","bytes":\d+,"checksum":"[a-f0-9]{64}","status":"success","format":"mysql-sqldump"\}
+\{"bytes":"\d+","checksum":"[a-f0-9]{64}","format":"mysql-sqldump","path":"/tmp/aux4-bkp-dirfile\.sql","status":"success"\}
 ```
 
 ## dump options
@@ -128,7 +128,7 @@ aux4 db mysql backup --configFile config.yaml --config test --maxAllowedPacket 5
 ```
 
 ```expect:regex
-\{"path":"/tmp/aux4-bkp-opts\.sql","bytes":\d+,"checksum":"[a-f0-9]{64}","status":"success","format":"mysql-sqldump"\}
+\{"bytes":"\d+","checksum":"[a-f0-9]{64}","format":"mysql-sqldump","path":"/tmp/aux4-bkp-opts\.sql","status":"success"\}
 ```
 
 ## backup failure
