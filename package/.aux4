@@ -1,0 +1,223 @@
+{
+  "scope": "aux4",
+  "name": "db-mysql-backup",
+  "version": "0.1.0",
+  "description": "backup and restore provider commands for the db:mysql profile (wraps mysqldump/mysql)",
+  "tags": [
+    "db",
+    "database",
+    "mysql",
+    "backup",
+    "restore"
+  ],
+  "dependencies": [
+    "aux4/db-mysql"
+  ],
+  "system": [
+    [
+      "test:mysqldump --version",
+      "brew:mysql-client",
+      "linux:mysql-client"
+    ],
+    [
+      "test:mysql --version",
+      "brew:mysql-client",
+      "linux:mysql-client"
+    ]
+  ],
+  "profiles": [
+    {
+      "name": "db:mysql",
+      "commands": [
+        {
+          "name": "backup",
+          "execute": [
+            "set:fullpath=",
+            "when:${dir} && ${file}:set:fullpath=${dir}/${file}",
+            "set:backuppath=nvl(path, fullpath)",
+            "when:${backuppath}==:exit:1:Error: provide --path, or --dir and --file",
+            "set:hasExt=!basename value(backuppath) | grep -c '\\.' || true",
+            "when:${hasExt}==0:set:backuppath=${backuppath}.sql",
+            "set:dumpOpts=",
+            "when:${singleTransaction}==true:set:dumpOpts=${dumpOpts} --single-transaction",
+            "when:${routines}==true:set:dumpOpts=${dumpOpts} --routines",
+            "when:${events}==true:set:dumpOpts=${dumpOpts} --events",
+            "when:${triggers}==false:set:dumpOpts=${dumpOpts} --skip-triggers",
+            "when:${noTablespaces}==true:set:dumpOpts=${dumpOpts} --no-tablespaces",
+            "set:dumpOpts=${dumpOpts} param(defaultCharacterSet:default-character-set) param(maxAllowedPacket:max-allowed-packet) param(where) param(ignoreTable:ignore-table) ${options}",
+            "MYSQLDUMP=$(command -v mysqldump 2>/dev/null); if [ -z \"$MYSQLDUMP\" ]; then BP=$(brew --prefix mysql-client 2>/dev/null); [ -n \"$BP\" ] && [ -x \"$BP/bin/mysqldump\" ] && MYSQLDUMP=\"$BP/bin/mysqldump\"; fi; if [ -z \"$MYSQLDUMP\" ]; then echo 'Error: mysqldump not found. Install mysql-client (brew install mysql-client / apt-get install default-mysql-client).' >&2; exit 1; fi; MYSQL_PWD=value(password) \"$MYSQLDUMP\" params(host, port, user) ${dumpOpts} value(database) > value(backuppath) || { rm -f value(backuppath); exit 1; }",
+            "set:bytes=!wc -c < value(backuppath) | tr -d ' '",
+            "set:checksum=!( shasum -a 256 value(backuppath) 2>/dev/null || sha256sum value(backuppath) ) | awk '{print $1}'",
+            "echo '{\"path\":\"${backuppath}\",\"bytes\":${bytes},\"checksum\":\"${checksum}\",\"status\":\"success\",\"format\":\"mysql-sqldump\"}'"
+          ],
+          "help": {
+            "text": "Backup the database to a SQL dump file using mysqldump",
+            "variables": [
+              {
+                "name": "host",
+                "text": "Database host",
+                "default": "localhost"
+              },
+              {
+                "name": "port",
+                "text": "Database port",
+                "default": "3306"
+              },
+              {
+                "name": "database",
+                "text": "Database name",
+                "default": "mysql"
+              },
+              {
+                "name": "user",
+                "text": "Database user",
+                "default": "root"
+              },
+              {
+                "name": "password",
+                "text": "Database password"
+              },
+              {
+                "name": "path",
+                "text": "Full path to write the dump file (takes precedence over --dir/--file)",
+                "default": ""
+              },
+              {
+                "name": "dir",
+                "text": "Directory to write the dump file (combined with --file)",
+                "default": ""
+              },
+              {
+                "name": "file",
+                "text": "File name for the dump (combined with --dir)",
+                "default": ""
+              },
+              {
+                "name": "singleTransaction",
+                "text": "Dump inside a single transaction for a consistent InnoDB snapshot without locking tables",
+                "default": "true"
+              },
+              {
+                "name": "routines",
+                "text": "Include stored procedures and functions in the dump",
+                "default": "true"
+              },
+              {
+                "name": "events",
+                "text": "Include scheduled events in the dump",
+                "default": "true"
+              },
+              {
+                "name": "triggers",
+                "text": "Include triggers in the dump",
+                "default": "true"
+              },
+              {
+                "name": "noTablespaces",
+                "text": "Skip tablespace DDL, which otherwise requires the PROCESS privilege on MySQL 8.0+",
+                "default": "true"
+              },
+              {
+                "name": "defaultCharacterSet",
+                "text": "Character set to use for the dump (mysqldump --default-character-set)",
+                "default": ""
+              },
+              {
+                "name": "maxAllowedPacket",
+                "text": "Maximum packet size, e.g. 512M (mysqldump --max-allowed-packet)",
+                "default": ""
+              },
+              {
+                "name": "where",
+                "text": "Only dump rows matching this condition (mysqldump --where)",
+                "default": ""
+              },
+              {
+                "name": "ignoreTable",
+                "text": "Table to exclude, as db.table (mysqldump --ignore-table)",
+                "default": ""
+              },
+              {
+                "name": "options",
+                "text": "Additional raw mysqldump options appended verbatim, e.g. '--hex-blob --skip-lock-tables'",
+                "default": ""
+              }
+            ]
+          }
+        },
+        {
+          "name": "restore",
+          "execute": [
+            "set:fullpath=",
+            "when:${dir} && ${file}:set:fullpath=${dir}/${file}",
+            "set:backuppath=nvl(path, fullpath)",
+            "when:${backuppath}==:exit:1:Error: provide --path, or --dir and --file",
+            "exists(backuppath) || { echo 'Error: backup file not found: ${backuppath}' >&2; exit 1; }",
+            "set:restoreOpts=param(defaultCharacterSet:default-character-set) param(maxAllowedPacket:max-allowed-packet) ${options}",
+            "MYSQL=$(command -v mysql 2>/dev/null); if [ -z \"$MYSQL\" ]; then BP=$(brew --prefix mysql-client 2>/dev/null); [ -n \"$BP\" ] && [ -x \"$BP/bin/mysql\" ] && MYSQL=\"$BP/bin/mysql\"; fi; if [ -z \"$MYSQL\" ]; then echo 'Error: mysql client not found. Install mysql-client (brew install mysql-client / apt-get install default-mysql-client).' >&2; exit 1; fi; MYSQL_PWD=value(password) \"$MYSQL\" params(host, port, user) ${restoreOpts} value(database) < value(backuppath)",
+            "echo '{\"path\":\"${backuppath}\",\"status\":\"success\"}'"
+          ],
+          "help": {
+            "text": "Restore the database from a SQL dump file using the mysql client",
+            "variables": [
+              {
+                "name": "host",
+                "text": "Database host",
+                "default": "localhost"
+              },
+              {
+                "name": "port",
+                "text": "Database port",
+                "default": "3306"
+              },
+              {
+                "name": "database",
+                "text": "Database name",
+                "default": "mysql"
+              },
+              {
+                "name": "user",
+                "text": "Database user",
+                "default": "root"
+              },
+              {
+                "name": "password",
+                "text": "Database password"
+              },
+              {
+                "name": "path",
+                "text": "Full path to the dump file to restore (takes precedence over --dir/--file)",
+                "default": ""
+              },
+              {
+                "name": "dir",
+                "text": "Directory containing the dump file (combined with --file)",
+                "default": ""
+              },
+              {
+                "name": "file",
+                "text": "File name of the dump (combined with --dir)",
+                "default": ""
+              },
+              {
+                "name": "defaultCharacterSet",
+                "text": "Character set to use while restoring (mysql --default-character-set)",
+                "default": ""
+              },
+              {
+                "name": "maxAllowedPacket",
+                "text": "Maximum packet size, e.g. 512M (mysql --max-allowed-packet)",
+                "default": ""
+              },
+              {
+                "name": "options",
+                "text": "Additional raw mysql client options appended verbatim",
+                "default": ""
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
